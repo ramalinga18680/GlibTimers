@@ -28,6 +28,27 @@ gboolean timerTwoFunc (gpointer user_data)
 	g_print("Timer 2 is ticking\n");
 	return TRUE;
 }
+static void g_task_callback(GObject *object,GAsyncResult *result,gpointer user_data)
+{
+	GError *error = NULL;
+	g_print("In g_task_callback\n");
+
+	if(g_task_propagate_boolean(G_TASK(result),&error)){
+		g_print("g_task is successful\n");
+
+	}else{
+		g_print("g_task failed\n");
+	}
+
+}
+static void g_task_thread(GTask *task,gpointer source_object,gpointer task_data,GCancellable *cancellable)
+{
+	GError *local_error=NULL;
+	g_print("I am in g_task_thread\n");
+	g_set_error(&local_error,G_OPTION_ERROR,G_OPTION_ERROR_FAILED,"the g_task failed");
+	//g_task_return_boolean(task,TRUE);
+	g_task_return_error(task,local_error);
+}
 /*The worker thread*/
 gpointer workerThreadFunc (gpointer data)
 {
@@ -40,6 +61,8 @@ gpointer workerThreadFunc (gpointer data)
 	GSource *timerSource = g_timeout_source_new_seconds(5);
 	g_source_set_callback (timerSource, timerTwoFunc, workLoop, NULL);
 	guint timerTwo = g_source_attach(timerSource,workerContext);
+
+
 	/* Get the worker thread mainloop going */
 	g_main_loop_run(workLoop);
 
@@ -59,6 +82,9 @@ int main (void)
 
 	workerThread = g_thread_new("WorkerThread",workerThreadFunc,NULL);
 
+	GTask * task = g_task_new(NULL,NULL,g_task_callback,NULL);
+	g_task_set_task_data(task,NULL,NULL);
+	g_task_run_in_thread(task,g_task_thread);
 	g_main_loop_run(loop);
 	g_thread_join(workerThread);
 
